@@ -122,7 +122,9 @@ class RespCmp:
         Denv_resp="%s_resp"%kCmp2
         Denv_eid="%s_eid"%kCmp2
         Denv_qid="%s_qid"%kCmp2
-        
+       
+        qid_dic[qid]["cmp1_eid"]=qid_dic[qid][Senv_eid]
+        qid_dic[qid]["cmp2_eid"]=qid_dic[qid][Denv_eid]
         qid_dic[qid]["cmp1_qid"]=qid_dic[qid]["qid"]
         qid_dic[qid]["cmp2_qid"]=qid_dic[qid][Denv_qid]
         qid_dic[qid]["cmp1_resp"]=qid_dic[qid][Senv_resp]
@@ -159,8 +161,11 @@ class RespCmp:
         conn.do(sqlstr,T)
         print "qid Store ok"
         if qid_dic[qid]["difference"]=="":
-            eid1=""
-            eid2=""
+            eid1=qid_dic[qid]["cmp1_eid"]
+            eid2=qid_dic[qid]["cmp2_eid"]
+            '''
+#            eid1=""
+#            eid2=""
             try:
 #                tmp=json.loads(resp1)
                 tmp=json.loads(qid_dic[qid]["cmp1_resp"])
@@ -174,6 +179,7 @@ class RespCmp:
                 print "no match eid2"
             qid_dic[qid]["cmp1_eid"]=eid1
             qid_dic[qid]["cmp2_eid"]=eid2
+            '''
             print "beforeCmpInfoByQid"
             if qid_dic[qid]["cmp1_eid"]!=0:
                 qid_dic[qid]["difference"]="%s's eid =%s"%(kCmp1,eid1)
@@ -206,6 +212,9 @@ class RespCmp:
             sqlstr="select req_params from nginx_api_log_%s where qid=%s and log_type='13' and req_type='%s';"%(kDate,kQid,kType)
             reqs=conn.do(sqlstr)
             print sqlstr
+            print reqs
+            if len(reqs)==0:
+                exit(1) 
     #        print reqs
             qid_dic[kQid]=dict()
             qid_dic[kQid]["qid"]=kQid
@@ -220,7 +229,7 @@ class RespCmp:
             print sqlstr
             resp=conn.do(sqlstr)
             qid_dic[kQid][Senv_resp]=resp[0]["response"]
-    #        print "resp=%s"%resp
+            print "resp=%s"%resp[0]["response"]
             try:
                 tmp=json.loads(resp[0]["response"])
     #            print "tmp=%s"%tmp
@@ -232,12 +241,14 @@ class RespCmp:
                 qid_dic[kQid][Senv_eid]=""
                 print "%s don't have error"%kQid
                 return 
-
-            eid=tmp["error"]["error_id"]
+            if "error_id" in tmp["error"]:
+                eid=tmp["error"]["error_id"]
+            else:
+                eid=tmp["error"]["errorid"]
             qid_dic[kQid][Senv_eid]=eid
 
         else:
-            conn=DBHandle(conf.Loadhost,conf.Loaduser,conf.Loadpasswd,'logQuery_online')
+            conn=DBHandle(conf.Loadhost,conf.Loaduser,conf.Loadpasswd,'logQuery_test')
             sqlstr="select qid,req_params from nginx_api_log_%s where req_type='%s' and log_type='13' group by qid having count(*)=1 order by rand() limit %d"%(kDate,kType,kNum)
             print sqlstr
             qids=conn.do(sqlstr)
@@ -396,7 +407,7 @@ class RespCmp:
                 ziduan="&uid=caoxiaolan&"
                 req=re.sub(ori_uid,ziduan,req)
                 print "query_req=%s"%req
-                self.__Query(qid,"test",req)
+#                self.__Query(qid,"test",req)
                 self.__Query(qid,"test1",req)
                 self.__Query(qid,"offline",req)
 
@@ -410,10 +421,7 @@ class RespCmp:
         print "before store"
         sqlstr="replace into all_about (date,\
                 req_type,\
-                online_qid,\
-                online_req,\
-                online_resp,\
-                online_eid,\
+                ori_req,\
                 test_qid,\
                 test_resp,\
                 test_eid,\
@@ -422,25 +430,24 @@ class RespCmp:
                 test1_eid,\
                 offline_qid,\
                 offline_resp,\
-                offline_eid) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                offline_eid) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+
         args=[]
         for qid,item in qid_dic.items():
             print "in store"
             T=(kDate,\
                     kType,\
-                    item["qid"],\
                     item["ori_req"],\
+                    item["qid"],\
                     item["on_resp"],\
                     item["on_eid"],\
-                    item["test_qid"],\
-                    item["test_resp"],\
-                    item["test_eid"],\
                     item["test1_qid"],\
                     item["test1_resp"],\
                     item["test1_eid"],\
                     item["offline_qid"],\
                     item["offline_resp"],\
                     item["offline_eid"])
+
             args.append(T)
         conn.do(sqlstr,args)
         print "after store"
@@ -458,20 +465,22 @@ class RespCmp:
         kCmp2_qid="%s_qid"%kCmp2
         kCmp2_resp="%s_resp"%kCmp2
         kCmp2_eid="%s_eid"%kCmp2
-        if kCmp1!="online":
+#        if kCmp1!="online":
+        if kCmp1!="test":
             order=kCmp1
         else:
             order=kCmp2
             
         conn=DBHandle(conf.Storehost,conf.Storeuser,conf.Storepasswd,conf.Storedb)
-        sqlstr="select online_qid,online_req,%s_qid,%s_resp,%s_eid,%s_qid,%s_resp,%s_eid from test.all_about where date=%s and req_type='%s' group by online_qid order by %s_qid desc limit %d;"%(kCmp1,kCmp1,kCmp1,kCmp2,kCmp2,kCmp2,kDate,kType,order,kNum-self.delete)
+#        sqlstr="select online_qid,online_req,%s_qid,%s_resp,%s_eid,%s_qid,%s_resp,%s_eid from test.all_about where date=%s and req_type='%s' group by online_qid order by %s_qid desc limit %d;"%(kCmp1,kCmp1,kCmp1,kCmp2,kCmp2,kCmp2,kDate,kType,order,kNum-self.delete)
+        sqlstr="select test_qid,ori_req,%s_qid,%s_resp,%s_eid,%s_qid,%s_resp,%s_eid from test.all_about where date=%s and req_type='%s' group by online_qid order by %s_qid desc limit %d;"%(kCmp1,kCmp1,kCmp1,kCmp2,kCmp2,kCmp2,kDate,kType,order,kNum-self.delete)
         print sqlstr
         rows=conn.do(sqlstr)
         for row in rows:
-            qid=row["online_qid"]
+            qid=row["test_qid"]
             qid_dic[qid]=dict()
             qid_dic[qid]["qid"]=qid
-            qid_dic[qid]["on_req"]=row["online_req"]
+            qid_dic[qid]["ori_req"]=row["ori_req"]
             qid_dic[qid]["cmp1_qid"]=row[kCmp1_qid]
             qid_dic[qid]["cmp1_resp"]=row[kCmp1_resp]
             qid_dic[qid]["cmp1_eid"]=row[kCmp1_eid]
@@ -514,7 +523,7 @@ class RespCmp:
                     qid_dic[qid]["difference"]=result
                     continue;
                 if qid_dic[qid]["cmp1_eid"]==qid_dic[qid]["cmp2_eid"]:
-                    print "on_req=%s"%(qid_dic[qid]["on_req"])
+                    print "ori_req=%s"%(qid_dic[qid]["ori_req"])
                     print "%s_resp=%s"%(kCmp1,qid_dic[qid]["cmp1_resp"])
                     print "%s_resp=%s"%(kCmp2,qid_dic[qid]["cmp2_resp"])
                     if qid_dic[qid]["cmp1_eid"]==0:
@@ -660,6 +669,8 @@ class RespCmp:
         #s125                   //data->view->summary->days->pois
         cmp1resp=json.loads(cmp1resp);
         cmp2resp=json.loads(cmp2resp)
+        print "cmp1resp=%s"%cmp1resp
+        print "cmp2resp=%s"%cmp2resp 
         if "data" not in cmp1resp and "data" not in cmp2resp:
             result="all is the same"
             return result
