@@ -1,7 +1,7 @@
 Loadhost='10.10.107.246'
 Loaduser='reader'
 Loadpasswd='miaoji1109'
-Storehost='127.0.0.1'
+Storehost='10.10.169.10'
 Storeuser="root"
-Storedb="test"
-Storepasswd=""
+Storedb="viewdiff"
+Storepasswd="miaoji1109"

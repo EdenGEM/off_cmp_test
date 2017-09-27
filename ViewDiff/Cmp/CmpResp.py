@@ -24,7 +24,7 @@ class RespCmp:
     qid_dic=dict()
     delete=0
 
-    def __init__(self,kDate="",kType="",kNum="",kQid="",kCmp1="",kCmp2="",Mail=""):
+    def __init__(self,kDate="",kType="",kNum="",kQid="",kCmp1="",kCmp2="",Mail="",fresh=""):
         self.kDate=kDate
         self.kType=kType
         self.kNum=kNum
@@ -32,6 +32,7 @@ class RespCmp:
         self.kCmp1=kCmp1
         self.kCmp2=kCmp2
         self.Mail=Mail
+        self.fresh=fresh
     def LoadReqAndRespByPatch(self):
         print "before LoadReqAndRespByPatch"
         print "before Load"
@@ -41,8 +42,6 @@ class RespCmp:
         print "before Store"
         self.__Store()
         print "LoadReqAndRespByPatch ok"
-
-
 
     def LoadReqAndRespByQid(self):
         print "before LoadReqAndRespByQid"
@@ -70,27 +69,31 @@ class RespCmp:
         <html><body>
         <h1 align="center">diff %s_%s</h1>
         <table border='1' align="center">
-        <tr><th>%s_qid</th><th>%s_qid</th><th>diff</th></tr>
+        <tr><th>origin_req</th><th>%s_qid</th><th>%s_qid</th><th>diff</th></tr>
         '''%(self.kCmp1,self.kCmp2,self.kCmp1,self.kCmp2)
         flag=0
-        if self.kQid:
-            by="qid"
+        env2=self.kCmp2
+        if self.fresh==1:
+            env1=self.kCmp1
         else:
-            by="patch"
+            env1="ori"
         for qid,item in Dict.items():
             if "difference" in item:
                 flag=1
                 html+='''
                 <tr>
                     <td>
-                    <a href="http://10.10.169.10:8000/cgi-bin/index.py?qid=%s&env=%s" target="_blank">%s</a>
+                    <a href="http://10.10.191.51:8000/cgi-bin/index.py?qid=%s&env=%s&load=req" target="_blank">%s</a>
                     </td>
                     <td>
-                    <a href="http://10.10.169.10:8000/cgi-bin/index.py?qid=%s&env=%s" target="_blank">%s</a>
+                    <a href="http://10.10.191.51:8000/cgi-bin/index.py?qid=%s&env=%s&load=resp" target="_blank">%s</a>
+                    </td>
+                    <td>
+                    <a href="http://10.10.191.51:8000/cgi-bin/index.py?qid=%s&env=%s&load=resp" target="_blank">%s</a>
                     </td>
                     <td>%s</td>
                 </tr>
-                '''%(item["cmp1_qid"],self.kCmp1,item["cmp1_qid"],item["cmp2_qid"],self.kCmp2,item["cmp2_qid"],item["difference"])
+                '''%(item["cmp1_qid"],env1,item["cmp1_qid"],item["cmp1_qid"],env1,item["cmp1_qid"],item["cmp2_qid"],env2,item["cmp2_qid"],item["difference"])
         if flag==0:
             html='''
             <html><body>
@@ -115,17 +118,24 @@ class RespCmp:
         kCmp1=self.kCmp1
         kCmp2=self.kCmp2
         qid=self.kQid
-        Senv_req="%s_req"%kCmp1
-        Senv_resp="%s_resp"%kCmp1
-        Senv_eid="%s_eid"%kCmp1
+        if self.fresh==1:
+            Senv_resp="%s_resp"%kCmp1
+            Senv_eid="%s_eid"%kCmp1
+            Senv_qid="%s_qid"%kCmp1
+        else:
+            Senv_resp="ori_resp"
+            Senv_eid="ori_eid"
+            Senv_qid="ori_qid"
+
         Denv_req="%s_req"%kCmp2
         Denv_resp="%s_resp"%kCmp2
         Denv_eid="%s_eid"%kCmp2
         Denv_qid="%s_qid"%kCmp2
-       
+        
+#        qid_dic[qid]["ori_req"]=qid_dic[qid][Senv_req]
         qid_dic[qid]["cmp1_eid"]=qid_dic[qid][Senv_eid]
         qid_dic[qid]["cmp2_eid"]=qid_dic[qid][Denv_eid]
-        qid_dic[qid]["cmp1_qid"]=qid_dic[qid]["qid"]
+        qid_dic[qid]["cmp1_qid"]=qid_dic[qid][Senv_qid]
         qid_dic[qid]["cmp2_qid"]=qid_dic[qid][Denv_qid]
         qid_dic[qid]["cmp1_resp"]=qid_dic[qid][Senv_resp]
         qid_dic[qid]["cmp2_resp"]=qid_dic[qid][Denv_resp]
@@ -137,22 +147,20 @@ class RespCmp:
         elif qid_dic[qid]["cmp2_resp"]=="":
             qid_dic[qid]["difference"]="%s: no response"%kCmp2
         conn=DBHandle(conf.Storehost,conf.Storeuser,conf.Storepasswd,conf.Storedb)
-        cmp1_qid="%s_qid"%kCmp1
-        cmp2_qid="%s_qid"%kCmp2
-        cmp1_resp="%s_resp"%kCmp1
-        cmp2_resp="%s_resp"%kCmp2
 
-        sqlstr="replace into all_about (date,\
+        sqlstr="replace into cmp_cases (date,\
                 req_type,\
+                ori_req,\
                 %s,\
                 %s,\
                 %s,\
-                %s) "%(cmp1_qid,cmp2_qid,cmp1_resp,cmp2_resp)
+                %s) "%(Senv_qid,Denv_qid,Senv_resp,Denv_resp)
 
-        sqlstr+="values(%s,%s,%s,%s,%s,%s)"
+        sqlstr+="values(%s,%s,%s,%s,%s,%s,%s)"
         args=[]
         T=(self.kDate,\
                 self.kType,\
+                qid_dic[qid]["ori_req"],\
                 qid_dic[qid]["cmp1_qid"],\
                 qid_dic[qid]["cmp2_qid"],\
                 qid_dic[qid]["cmp1_resp"],\
@@ -161,32 +169,17 @@ class RespCmp:
         conn.do(sqlstr,T)
         print "qid Store ok"
         if qid_dic[qid]["difference"]=="":
-            eid1=qid_dic[qid]["cmp1_eid"]
-            eid2=qid_dic[qid]["cmp2_eid"]
-            '''
-#            eid1=""
-#            eid2=""
-            try:
-#                tmp=json.loads(resp1)
-                tmp=json.loads(qid_dic[qid]["cmp1_resp"])
-                eid1=tmp["error"]["error_id"]
-            except:
-                print "no match eid1"
-            try:
-                tmp=json.loads(qid_dic[qid]["cmp2_resp"])
-                eid2=tmp["error"]["error_id"]
-            except:
-                print "no match eid2"
-            qid_dic[qid]["cmp1_eid"]=eid1
-            qid_dic[qid]["cmp2_eid"]=eid2
-            '''
             print "beforeCmpInfoByQid"
-            if qid_dic[qid]["cmp1_eid"]!=0:
-                qid_dic[qid]["difference"]="%s's eid =%s"%(kCmp1,eid1)
-            elif qid_dic[qid]["cmp1_eid"]==qid_dic[qid]["cmp2_eid"]:
-                qid_dic[qid]["difference"]=self.__CmpInfo(qid_dic[qid]["cmp1_resp"],qid_dic[qid]["cmp2_resp"])
+            if qid_dic[qid]["cmp1_eid"]==qid_dic[qid]["cmp2_eid"]:
+                if qid_dic[qid]["cmp1_eid"]==0:
+                    result=self.__CmpInfo(qid_dic[qid]["cmp1_resp"],qid_dic[qid]["cmp2_resp"])
+                else:
+                    result="their error_id = %s"%qid_dic[qid]["cmp1_eid"]
             else:
-                qid_dic[qid]["difference"]="%s's eid =%s"%(kCmp2,eid2)
+                result="error_id is diff"
+
+            print "result=%s"%result
+            qid_dic[qid]["difference"]=result
         print "CmpInfoByQid ok"
         self.__mymail(qid_dic)
 
@@ -205,22 +198,21 @@ class RespCmp:
             Senv_resp="%s_resp"%Senv
             Senv_eid="%s_eid"%Senv
 
-            dbb="logQuery_%s"%Senv
+            dbb="logQuery_test"
             print dbb
             conn=DBHandle(conf.Loadhost,conf.Loaduser,conf.Loadpasswd,dbb)
-#            sqlstr="select req_params from nginx_api_log_%s where qid=%s and log_type='13' and req_type in('s125','s127','s128','s129' ,'s130' ,'p101' ,'p104' ,'p105','b116');"%(kDate,kQid)
             sqlstr="select req_params from nginx_api_log_%s where qid=%s and log_type='13' and req_type='%s';"%(kDate,kQid,kType)
-            reqs=conn.do(sqlstr)
             print sqlstr
-            print reqs
+            reqs=conn.do(sqlstr)
             if len(reqs)==0:
-                exit(1) 
+                print "mysql have no data"
+                exit(1)
+            print reqs
     #        print reqs
             qid_dic[kQid]=dict()
-            qid_dic[kQid]["qid"]=kQid
-            qid_dic[kQid][Senv_req]=reqs[0]["req_params"]
+            qid_dic[kQid]["ori_qid"]=kQid
+            qid_dic[kQid]["ori_req"]=reqs[0]["req_params"]
             print"in select"
-#            sqlstr="select id from nginx_api_log_%s where qid=%s and log_type='14' and req_type in('s125' ,'s127','s128','s129','s130' ,'p101','p104','p105' ,'b116');"%(kDate,kQid)
             sqlstr="select id from nginx_api_log_%s where qid=%s and log_type='14' and req_type='%s';"%(kDate,kQid,kType)
             print sqlstr
             ids=conn.do(sqlstr)
@@ -228,7 +220,7 @@ class RespCmp:
             sqlstr="select response from nginx_api_resp_%s where id=%s;"%(kDate,ids[0]["id"])
             print sqlstr
             resp=conn.do(sqlstr)
-            qid_dic[kQid][Senv_resp]=resp[0]["response"]
+            qid_dic[kQid]["ori_resp"]=resp[0]["response"]
             print "resp=%s"%resp[0]["response"]
             try:
                 tmp=json.loads(resp[0]["response"])
@@ -243,22 +235,27 @@ class RespCmp:
                 return 
             if "error_id" in tmp["error"]:
                 eid=tmp["error"]["error_id"]
-            else:
+            elif "errorid"in tmp["error"]:
+                print "appear errorid"
                 eid=tmp["error"]["errorid"]
-            qid_dic[kQid][Senv_eid]=eid
+            else:
+                print "no error_id"
+                eid=""
+            qid_dic[kQid]["ori_eid"]=eid
 
         else:
             conn=DBHandle(conf.Loadhost,conf.Loaduser,conf.Loadpasswd,'logQuery_test')
-            sqlstr="select qid,req_params from nginx_api_log_%s where req_type='%s' and log_type='13' group by qid having count(*)=1 order by rand() limit %d"%(kDate,kType,kNum)
+            sqlstr="select qid,req_params from nginx_api_log_%s where req_type='%s' and log_type='13' group by qid having count(*)=1 order by rand() limit %d;"%(kDate,kType,kNum)
             print sqlstr
             qids=conn.do(sqlstr)
-            print"in select"
+            if len(qids)==0:
+                print "mysql have no data"
+                exit(1)
             sqlstr="select qid,id from nginx_api_log_%s where req_type='%s' and log_type='14' and qid in("%(kDate,kType)
-            
             for i,row in enumerate(qids):
                 qid=row["qid"]
                 qid_dic[qid]=dict()
-                qid_dic[qid]["qid"]=qid
+                qid_dic[qid]["ori_qid"]=qid
                 qid_dic[qid]["req_type"]=kType
                 print row["qid"]
                 print "yuan_req:%s"%row["req_params"]
@@ -268,8 +265,8 @@ class RespCmp:
                 else:
                     sqlstr+="%s,"%row["qid"]
             sqlstr+=");"
-            ids=conn.do(sqlstr)
             print sqlstr
+            ids=conn.do(sqlstr)
             id_dic=dict()
             sqlstr="select id,response from nginx_api_resp_%s where id in ("%kDate
             for i,row in enumerate(ids):
@@ -292,7 +289,7 @@ class RespCmp:
                     print "no response_delete=%d"%(self.delete)
                     continue
                 resp=row["response"]
-                qid_dic[qidd]["on_resp"]=resp 
+                qid_dic[qidd]["ori_resp"]=resp 
                 print "qid=%s"%qidd
                 print resp
                 try:
@@ -309,22 +306,27 @@ class RespCmp:
                     self.delete+=1
                     print "no error_delete=%d"%(self.delete)
                     continue;
-                try:
+                if "error_id" in tmp["error"]:
                     eid=tmp["error"]["error_id"]
-                except:
-                    print "error_id 字段有误"
-                    eid=""
-                print "on_eid=%s"%eid
-                qid_dic[qidd]["on_eid"]=eid
+                elif "errorid" in tmp["error"]:
+                    print "appear errorid"
+                    eid=tmp["error"]["errorid"]
+                else:
+                    pop_item=qid_dic.pop(qidd)
+                    self.delete+=1
+                    print "no error_id,delete=%d"%self.delete
+                print "ori_eid=%s"%eid
+                qid_dic[qidd]["ori_eid"]=eid
 
-                #print "Eden",type(eid)
+                # test 库中的error_id !=0 过滤
                 if eid != 0:
                     pop_item=qid_dic.pop(qidd)
-                    print "online_error_id !=0,pop"
+                    self.delete+=1
+                    print "ori_eid !=0,delete=%d"%self.delete
 
         self.qid_dic=qid_dic
 
-    def __Query(self,qid,env,req):
+    def __Query(self,qid,env,req):     #拿req 打不同的服务器
         qid_dic=self.qid_dic
         env_qid="%s_qid"%env
         env_resp="%s_resp"%env
@@ -339,6 +341,7 @@ class RespCmp:
         req=re.sub(originqid,ziduan,req)
     #    print "%s=%s"%(env_req,req)
         print  10 * "*"
+        print "self.fresh=%d"%self.fresh
         qid_dic[qid][env_req]=req
         if env=="test":
             url="http://10.10.135.140:92/?"+req
@@ -383,75 +386,80 @@ class RespCmp:
             Denv=self.kCmp2
             Senv_req="%s_req"%Senv
             Senv_resp="%s_resp"%Senv
-            req=qid_dic[kQid][Senv_req]
+            req=qid_dic[kQid]["ori_req"]
             ori_uid=re.compile(r'&uid=(.+)&')
             ziduan="&uid=caoxiaolan&"
             req=re.sub(ori_uid,ziduan,req)
             print "query_req=%s"%req
-            print "%s_resp=%s"%(Senv,qid_dic[kQid][Senv_resp])
+            print "test_resp=%s"%(qid_dic[kQid]["ori_resp"])
             self.__Query(kQid,Denv,req)
+            if self.fresh==1:
+                self.__Query(kQid,Senv,req)
         else:
             for qid,item in qid_dic.items():
-                if "qid" not in qid_dic[qid] or "ori_req" not in qid_dic[qid] or "on_eid" not in qid_dic[qid]:
+                if "ori_qid" not in qid_dic[qid] or "ori_req" not in qid_dic[qid] or "ori_eid" not in qid_dic[qid]:
                     pop_item=qid_dic.pop(qid);
                     self.delete+=1
                     print "T,delete=%d"%(self.delete)
-                    continue;
-                if qid_dic[qid]["on_eid"]!=0:
-                    pop_item=qid_dic.pop(qid)
-                    self.delete+=1
-                    print "on_eid!=0,delete=%d"%(self.delete)
                     continue;
                 req=qid_dic[qid]["ori_req"]
                 ori_uid=re.compile(r'&uid=(.+)&')
                 ziduan="&uid=caoxiaolan&"
                 req=re.sub(ori_uid,ziduan,req)
                 print "query_req=%s"%req
-#                self.__Query(qid,"test",req)
-                self.__Query(qid,"test1",req)
-                self.__Query(qid,"offline",req)
+                self.__Query(qid,self.kCmp2,req)
+                if self.fresh==1:
+                    self.__Query(qid,self.kCmp1,req)
 
-#    def Store(kDate,kType):
-    def __Store(self):
+    def __Store(self):      #将对比环境的各自响应信息存库
         qid_dic=self.qid_dic
         kDate=self.kDate
         kType=self.kType
         print "self.kType=%s"%self.kType
         conn=DBHandle(conf.Storehost,conf.Storeuser,conf.Storepasswd,conf.Storedb)
         print "before store"
-        sqlstr="replace into all_about (date,\
+        if self.fresh!=1:
+            Senv='ori'
+        else:
+            Senv=self.kCmp1
+        Denv=self.kCmp2
+        Senv_qid='%s_qid'%Senv
+        Senv_resp='%s_resp'%Senv
+        Senv_eid='%s_eid'%Senv
+        Denv_qid='%s_qid'%Denv
+        Denv_resp='%s_resp'%Denv
+        Denv_eid='%s_eid'%Denv
+#        if self.fresh==1:
+        sqlstr="replace into cmp_cases (date,\
                 req_type,\
                 ori_req,\
-                test_qid,\
-                test_resp,\
-                test_eid,\
-                test1_qid,\
-                test1_resp,\
-                test1_eid,\
-                offline_qid,\
-                offline_resp,\
-                offline_eid) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-
+                %s,\
+                %s,\
+                %s,\
+                %s,\
+                %s,\
+                %s)"%(Senv_qid,Senv_resp,Senv_eid,Denv_qid,Denv_resp,Denv_eid)
+        sqlstr+=" values(%s,%s,%s,%s,%s,%s,%s,%s,%s)"
         args=[]
         for qid,item in qid_dic.items():
             print "in store"
             T=(kDate,\
                     kType,\
                     item["ori_req"],\
-                    item["qid"],\
-                    item["on_resp"],\
-                    item["on_eid"],\
-                    item["test1_qid"],\
-                    item["test1_resp"],\
-                    item["test1_eid"],\
-                    item["offline_qid"],\
-                    item["offline_resp"],\
-                    item["offline_eid"])
-
+                    item[Senv_qid],\
+                    item[Senv_resp],\
+                    item[Senv_eid],\
+                    item[Denv_qid],\
+                    item[Denv_resp],\
+                    item[Denv_eid])
             args.append(T)
+            print "%s_eid=%d"%(Senv,item[Senv_eid])
+            print "%s_eid=%d"%(Denv,item[Denv_eid])
         conn.do(sqlstr,args)
         print "after store"
-    def __Fetch(self):
+
+
+    def __Fetch(self):    #拿两个环境的response
         self.qid_dic=dict()
         qid_dic=self.qid_dic
         kCmp1=self.kCmp1
@@ -459,27 +467,32 @@ class RespCmp:
         kDate=self.kDate
         kType=self.kType
         kNum=self.kNum
-        kCmp1_qid="%s_qid"%kCmp1
-        kCmp1_resp="%s_resp"%kCmp1
-        kCmp1_eid="%s_eid"%kCmp1
+        
+        if self.fresh==0:
+            env1="ori"
+        else:
+            env1=kCmp1
+        
+        kCmp1_qid="%s_qid"%env1
+        kCmp1_resp="%s_resp"%env1
+        kCmp1_eid="%s_eid"%env1
         kCmp2_qid="%s_qid"%kCmp2
         kCmp2_resp="%s_resp"%kCmp2
         kCmp2_eid="%s_eid"%kCmp2
 #        if kCmp1!="online":
-        if kCmp1!="test":
-            order=kCmp1
+        if env1!="ori":
+            order=env1
         else:
             order=kCmp2
             
         conn=DBHandle(conf.Storehost,conf.Storeuser,conf.Storepasswd,conf.Storedb)
-#        sqlstr="select online_qid,online_req,%s_qid,%s_resp,%s_eid,%s_qid,%s_resp,%s_eid from test.all_about where date=%s and req_type='%s' group by online_qid order by %s_qid desc limit %d;"%(kCmp1,kCmp1,kCmp1,kCmp2,kCmp2,kCmp2,kDate,kType,order,kNum-self.delete)
-        sqlstr="select test_qid,ori_req,%s_qid,%s_resp,%s_eid,%s_qid,%s_resp,%s_eid from test.all_about where date=%s and req_type='%s' group by online_qid order by %s_qid desc limit %d;"%(kCmp1,kCmp1,kCmp1,kCmp2,kCmp2,kCmp2,kDate,kType,order,kNum-self.delete)
+        sqlstr="select ori_req,%s_qid,%s_resp,%s_eid,%s_qid,%s_resp,%s_eid from cmp_cases where date=%s and req_type='%s' order by %s_qid desc limit %d;"%(env1,env1,env1,kCmp2,kCmp2,kCmp2,kDate,kType,order,kNum-self.delete)
         print sqlstr
         rows=conn.do(sqlstr)
         for row in rows:
-            qid=row["test_qid"]
+            qid=row[kCmp1_qid]
             qid_dic[qid]=dict()
-            qid_dic[qid]["qid"]=qid
+#            qid_dic[qid]["ori_qid"]=qid
             qid_dic[qid]["ori_req"]=row["ori_req"]
             qid_dic[qid]["cmp1_qid"]=row[kCmp1_qid]
             qid_dic[qid]["cmp1_resp"]=row[kCmp1_resp]
@@ -491,62 +504,50 @@ class RespCmp:
         self.qid_dic=qid_dic
         
 
-    def __GetResp(self):
+    def __GetResp(self):   #预处理一下error_id 和response,并存结果difference(ByPatch)
         qid_dic=self.qid_dic
         kCmp1=self.kCmp1
         kCmp2=self.kCmp2
         
-        with io.open('./diff_error','w') as fp:
-            for qid,item in qid_dic.items():
-                if qid_dic[qid]["cmp1_resp"]=="" and qid_dic[qid]["cmp2_resp"]=="":
-                    pop_item=qid_dic.pop(qid)
-                    print "pop: no resp"
-                    continue;
-                elif qid_dic[qid]["cmp1_resp"]=="":
-                    result="%s: no resp"%kCmp1
-                    qid_dic[qid]["difference"]=result
-                    continue;
-                elif qid_dic[qid]["cmp2_resp"]=="":
-                    result="%s: no resp"%kCmp2
-                    qid_dic[qid]["difference"]=result
-                    continue;
-                if qid_dic[qid]["cmp1_eid"]=="" and qid_dic[qid]["cmp2_eid"]=="":
-                    print "pop: no eid"
-                    pop_item=qid_dic.pop(qid)
-                    continue;
-                elif qid_dic[qid]["cmp1_eid"]=="":
-                    result="%s: no eid"%kCmp1
-                    qid_dic[qid]["difference"]=result
-                    continue;
-                elif qid_dic[qid]["cmp2_eid"]=="":
-                    result="%s: no eid"%kCmp2
-                    qid_dic[qid]["difference"]=result
-                    continue;
-                if qid_dic[qid]["cmp1_eid"]==qid_dic[qid]["cmp2_eid"]:
-                    print "ori_req=%s"%(qid_dic[qid]["ori_req"])
-                    print "%s_resp=%s"%(kCmp1,qid_dic[qid]["cmp1_resp"])
-                    print "%s_resp=%s"%(kCmp2,qid_dic[qid]["cmp2_resp"])
-                    if qid_dic[qid]["cmp1_eid"]==0:
-                        result=self.__CmpInfo(qid_dic[qid]["cmp1_resp"],qid_dic[qid]["cmp2_resp"])
-                    else:
-                        result="their error_id != 0"
+        for qid,item in qid_dic.items():
+            if qid_dic[qid]["cmp1_resp"]=="" and qid_dic[qid]["cmp2_resp"]=="":
+                pop_item=qid_dic.pop(qid)
+                print "pop: no resp"
+                continue;
+            elif qid_dic[qid]["cmp1_resp"]=="":
+                result="%s: no resp"%kCmp1
+                qid_dic[qid]["difference"]=result
+                continue;
+            elif qid_dic[qid]["cmp2_resp"]=="":
+                result="%s: no resp"%kCmp2
+                qid_dic[qid]["difference"]=result
+                continue;
+            if qid_dic[qid]["cmp1_eid"]=="" and qid_dic[qid]["cmp2_eid"]=="":
+                print "pop: no eid"
+                pop_item=qid_dic.pop(qid)
+                continue;
+            elif qid_dic[qid]["cmp1_eid"]=="":
+                result="%s: no eid"%kCmp1
+                qid_dic[qid]["difference"]=result
+                continue;
+            elif qid_dic[qid]["cmp2_eid"]=="":
+                result="%s: no eid"%kCmp2
+                qid_dic[qid]["difference"]=result
+                continue;
+            print "ori_req=%s"%(qid_dic[qid]["ori_req"])
+            print "%s_resp=%s"%(kCmp1,qid_dic[qid]["cmp1_resp"])
+            print "%s_resp=%s"%(kCmp2,qid_dic[qid]["cmp2_resp"])
+            if qid_dic[qid]["cmp1_eid"]==qid_dic[qid]["cmp2_eid"]:
+                if qid_dic[qid]["cmp1_eid"]==0:
+                    result=self.__CmpInfo(qid_dic[qid]["cmp1_resp"],qid_dic[qid]["cmp2_resp"])
                 else:
-                    result="error_id is diff"
+                    result="their error_id =%s"%qid_dic[qid]["cmp1_eid"]
+            else:
+                result="error_id is diff"
 
-                print "result=%s"%result
-                if result!="all is the same":
-                    qid_dic[qid]["difference"]=result
-                    '''
-                    fp.write(("qid=%s\n"%qid).decode('utf-8'))
-                    fp.write(("cmp1_qid=%s\n"%item["cmp1_qid"]).decode('utf-8'))
-                    fp.write(("cmp2_qid=%s\n"%item["cmp2_qid"]).decode('utf-8'))
-                    print "error_id diff, go diff_error"
-                    fp.write(("on_req=%s\n"%item["on_req"]).decode('utf-8'))
-                    fp.write(("cmp1_eid=%s\n"%item["cmp1_eid"]).decode('utf-8'))
-                    fp.write(("cmp2_eid=%s\n"%item["cmp2_eid"]).decode('utf-8'))
-                    fp.write(("cmp1_resp=%s\n"%item["cmp1_resp"]).decode('utf-8'))
-                    fp.write(("cmp2_resp=%s\n"%item["cmp2_resp"]).decode('utf-8'))
-                    '''
+            print "result=%s"%result
+            if result!="all is the same":
+                qid_dic[qid]["difference"]=result
         self.qid_dic=qid_dic
 
     def __CmpProduct(self,cmp1resp,cmp2resp):
@@ -581,55 +582,117 @@ class RespCmp:
             if cmp1_product[key] is None and cmp2_product[key] is None:
                 continue;
             elif cmp1_product[key] is None:
-                result="%s product[%s] is None"%(kCmp1,key)
+                result="%s: product[%s] is None"%(kCmp1,key)
                 return result
             elif cmp2_product[key] is None or key not in cmp2_product:
-                result="%s product[%s] is None"%(kCmp2,key)
+                result="%s: product[%s] is None"%(kCmp2,key)
                 return result
             elif cmp1_product[key] != cmp2_product[key]:
                 if len(cmp1_product[key])!=len(cmp2_product[key]):
                     result="length_product[%s]"%key
                     return result
                 else:
-#                    kk=0
                     for keyi in cmp1_product[key]:
                         if keyi not in  cmp2_product[key] :
                             result="product[%s][%s] not in %s"%(key,keyi,kCmp2)
                             return result
-#                        else:
- #                           kk+=1
             else:
                 continue
         return "all is the same"
 
+    def __CmpViewDate(self,env,days,cidx):
+        print "in CmpViewDate"
+        Months=[0,31,59,90, 120, 151, 181, 212, 243, 273, 304, 334]
+        didx=0
+        temp=0
+        while didx <len(days):
+#            print "day=%s"%days[didx]
+            if days[didx]["pois"] is None :
+                print "pois is None"
+                continue
+            days_date=days[didx]["date"]
+            print "str_day=%s"%days_date
+            days_date=int(days_date)
+            year=days_date/10000
+            month=(days_date%10000)/100
+            day=(days_date%100)
+            Sum=Months[month-1]+day
+            if ((year%4==0 and year%100!=0) or (year%400==0) and month>2):
+                Sum+=1
+            if didx==0:
+                temp=Sum
+            else:
+                diff=Sum-temp
+                if diff==1:
+                    temp=Sum
+                else:
+                    if cidx==-1:
+                        result="%s: date_day[%d] is wrong"%(env,didx)
+                    else:
+                        result="%s: date_list[%d]day[%d] is wrong"%(env,cidx,didx)
+                    return result
+            didx+=1
+        return "all is the same"
+
+
+
     def __CmpView(self,cmp1_view,cmp2_view,cidx):
+        print "in CmpView"
         cmp1_days=cmp1_view["summary"]["days"]
         cmp2_days=cmp2_view["summary"]["days"]
         result="all is the same"
-        print "cmp1_days=%s"%cmp1_days
-        print "cmp2_days=%s"%cmp2_days
+#        print "cmp1_days=%s"%cmp1_days
+#        print "cmp2_days=%s"%cmp2_days
         if cmp1_days=='None' and cmp2_days=='None':
             return result
         elif cmp1_days=='None':
-            result="%s: days_list[%d] is None"%(self.kCmp1,cidx)
+            if cidx!=-1:
+                result="%s: days_list[%d] is None"%(self.kCmp1,cidx)
+            else:
+                result="%s: days is None"%(self.kCmp1)
         elif cmp2_days=='None':
-            result="%s: days_list[%d] is None"%(self.kCmp2,cidx)
+            if cidx!=-1:
+                result="%s: days_list[%d] is None"%(self.kCmp2,cidx)
+            else:
+                result="%s: days is None"%(self.kCmp2)
+        if result != "all is the same":
+            return result
+
+        print "cidx=%d"%cidx
+        result=self.__CmpViewDate(self.kCmp1,cmp1_days,cidx)
+        print "cmp1_days cmp ok"
+        if result=="all is the same":
+            result=self.__CmpViewDate(self.kCmp2,cmp2_days,cidx)
+        else:
+            tmp=self.__CmpViewDate(self.kCmp2,cmp2_days,cidx)
+            if tmp!="all is the same":
+                result=result+', '+tmp
+        print "cmp2_days cmp ok"
+        if result!="all is the same":
+            return result
 #        if type(cmp1_days)=='NoneType' or type(cmp2_days)=='NoneType':
 #            return result
         if len(cmp1_days)!=len(cmp2_days):
-            result="length_days"
+            if cidx==-1:
+                result="length_days is diff"
+            else:
+                result="length_list[%d]days is diff"%cidx
             return result
         else:
             didx=0
+            z=0
             while didx<len(cmp1_days):
                 cmp1_pois=cmp1_days[didx]["pois"]
                 cmp2_pois=cmp2_days[didx]["pois"]
                 if len(cmp1_pois)!=len(cmp2_pois):
-                    result="length_pois of list[%d]day[%d]"%(cidx,didx)
+                    if cidx==-1:
+                        result="length_pois of day[%d]"%(didx)
+                    else:
+                        result="length_pois of list[%d]day[%d]"%(cidx,didx)
                     return result
                 else:
                     vidx=0
-                    z=0
+#                    z=0
                     while vidx<len(cmp1_pois):
                         cmp1_id=cmp1_pois[vidx]["id"]
                         cmp2_id=cmp2_pois[vidx]["id"]
@@ -659,6 +722,8 @@ class RespCmp:
                         vidx+=1
                 didx+=1
             return result
+            print "CmpView ok"
+
     def __CmpInfo(self,cmp1resp,cmp2resp):
         kCmp1=self.kCmp1
         kCmp2=self.kCmp2
@@ -669,8 +734,6 @@ class RespCmp:
         #s125                   //data->view->summary->days->pois
         cmp1resp=json.loads(cmp1resp);
         cmp2resp=json.loads(cmp2resp)
-        print "cmp1resp=%s"%cmp1resp
-        print "cmp2resp=%s"%cmp2resp 
         if "data" not in cmp1resp and "data" not in cmp2resp:
             result="all is the same"
             return result
@@ -694,7 +757,7 @@ class RespCmp:
         result=self.__CmpProduct(cmp1resp,cmp2resp)
         if result!="all is the same":
             return result
-        print "before view cmp"
+        print "before CmpView"
         if kType=="s127":
             print "in s127 view_cmp"
             if "list" not in cmp1resp["data"] and "list" not in cmp2resp["data"]:
@@ -717,15 +780,16 @@ class RespCmp:
                     continue;
                 elif cmp1_view is None and cmp2_view!=None:
                     print "cmp1_view is null"
-                    result="%s: view_list[%d] is None"%(kCmp1,i+1)
+                    result="%s: view_list[%d] is None"%(kCmp1,i)
                     return result
                 elif cmp1_view!=None and cmp2_view is None:
-                    result="%s: view_list[%d] is None"%(kCmp2,i+1)
+                    result="%s: view_list[%d] is None"%(kCmp2,i)
                     return result
 
                 else:
-                    print "before CmpView"
                     result=self.__CmpView(cmp1_view,cmp2_view,i)
+                    if result != "all is the same":
+                        return result
                 i+=1
             return result
 
@@ -755,6 +819,7 @@ class RespCmp:
                 return result
 
             if "view" not in cmp1resp["data"]["city"] or cmp1resp["data"]["city"]["view"] is None and ("view" not in cmp2resp["data"]["city"] or cmp2resp["data"]["city"]["view"] is None ):
+                print "view is None"
                 return result
             elif "view" not in cmp1resp["data"]["city"] or cmp1resp["data"]["city"]["view"] is None:
                 result="%s: no view"%kCmp1
@@ -764,7 +829,6 @@ class RespCmp:
                 return result
             cmp1_view=cmp1resp["data"]["city"]["view"]
             cmp2_view=cmp2resp["data"]["city"]["view"]
-            print "before CmpView"
             result=self.__CmpView(cmp1_view,cmp2_view,-1)
             return result
 

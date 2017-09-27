@@ -1,3 +1,9 @@
+> 使用：
+> 批量对比：eg：python run.py -d 20170919 -t s127 -n 10 -e test/offline -m caoxiaolan@mioji.com >a
+	  注意：1.默认是从运维库中的 test 环境拿请求 ，-e 指定一个或两个除 online 以外的环境 （不打online环境）2. 指定一个环境时，默认是和运维库中的 test 的 response对比，若指定了两个环境，则对比的是新打的请求的response
+	
+> 指定qid对比：eg：python run.py -q 1505979312144 -t s127 -e test -m caoxiaolan@mioji.com >a 
+
 # class ResCmp: 
 ## public:
 > ResCmp.py
